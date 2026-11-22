@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "db-guard": {
+      "command": "/absolute/path/to/db-guard-mcp",
+      "env": {
+        "DATABASE_URL": "postgres://devuser:devpassword@localhost:55432/ecommerce_demo?sslmode=disable",
+        "DB_GUARD_QUERY_TIMEOUT": "10s",
+        "DB_GUARD_MAX_SAMPLE_ROWS": "25"
+      }
+    }
+  }
+}

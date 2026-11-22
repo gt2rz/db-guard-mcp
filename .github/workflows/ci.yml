@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Unit tests
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Build
+        run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o db-guard-mcp ./cmd/server
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  integration:
+    name: Integration tests against PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: devuser
+          POSTGRES_PASSWORD: devpassword
+          POSTGRES_DB: ecommerce_demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devuser -d ecommerce_demo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Load demo dataset
+        env:
+          PGPASSWORD: devpassword
+        run: psql -h localhost -U devuser -d ecommerce_demo -v ON_ERROR_STOP=1 -f init.sql
+
+      - name: Integration tests
+        env:
+          TEST_DATABASE_URL: postgres://devuser:devpassword@localhost:5432/ecommerce_demo?sslmode=disable
+        run: go test -tags integration -v ./internal/db/...
+
+      - name: Build binary
+        run: CGO_ENABLED=0 go build -trimpath -o db-guard-mcp ./cmd/server
+
+      - name: MCP end-to-end smoke test
+        env:
+          DATABASE_URL: postgres://devuser:devpassword@localhost:5432/ecommerce_demo?sslmode=disable
+        run: python3 scripts/smoke_test.py ./db-guard-mcp

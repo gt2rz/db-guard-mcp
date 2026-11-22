@@ -1,0 +1,16 @@
+# Build artifacts
+/db-guard-mcp
+/db-guard-mcp.exe
+/dist/
+coverage.out
+*.test
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/

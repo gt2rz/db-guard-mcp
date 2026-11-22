@@ -1,0 +1,14 @@
+DB-Guard MCP
+Copyright 2026 Miguel Gutiérrez
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components retain their own licenses:
+
+  * github.com/mark3labs/mcp-go            (MIT)
+  * github.com/jackc/pgx/v5                (MIT)
+  * github.com/wasilibs/go-pgquery         (Apache-2.0)
+  * github.com/pganalyze/pg_query_go       (BSD-3-Clause, PostgreSQL license for libpg_query)
+  * github.com/tetratelabs/wazero          (Apache-2.0)
+
+The full dependency graph and versions are pinned in go.mod / go.sum.
