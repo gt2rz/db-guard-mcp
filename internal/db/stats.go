@@ -167,7 +167,7 @@ func slowQueries(ctx context.Context, pool *pgxpool.Pool) ([]SlowQueryStat, stri
 	if err != nil {
 		// The extension can be installed without the view being readable by
 		// the current role. Degrade gracefully instead of failing the tool.
-		return []SlowQueryStat{}, "pg_stat_statements is installed but not readable by this role; only table scan metrics are available", nil
+		return []SlowQueryStat{}, slowQueriesUnavailable, nil
 	}
 	defer rows.Close()
 
@@ -175,13 +175,18 @@ func slowQueries(ctx context.Context, pool *pgxpool.Pool) ([]SlowQueryStat, stri
 	for rows.Next() {
 		var stat SlowQueryStat
 		if err := rows.Scan(&stat.Query, &stat.Calls, &stat.MeanTimeMs, &stat.TotalTimeMs, &stat.Rows); err != nil {
-			return nil, "", fmt.Errorf("scan pg_stat_statements: %w", err)
+			return []SlowQueryStat{}, slowQueriesUnavailable, nil
 		}
 		stat.Query = security.MaskPII(stat.Query)
 		result = append(result, stat)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, "", fmt.Errorf("read pg_stat_statements: %w", err)
+		// pgx reports errors such as "pg_stat_statements must be loaded via
+		// shared_preload_libraries" (SQLSTATE 55000) at iteration time, not at
+		// Query time. Keep whatever rows were read and degrade gracefully.
+		return result, slowQueriesUnavailable, nil
 	}
 	return result, "", nil
 }
+
+const slowQueriesUnavailable = "pg_stat_statements is installed but unavailable to this role (not preloaded or insufficient privileges); only table scan metrics are available"
